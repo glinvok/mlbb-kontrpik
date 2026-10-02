@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MLBB Контрпик</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=Onest:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky draft bar (lane + 5 enemy slots) on top; below, hero picker left and live advice right (tabs on phone). Single dark theme: in-game use. */
+:root{
+  --bg:#0d1220; --panel:#151c2e; --panel2:#1c2540; --line:#2a3556;
+  --fg:#e9edf7; --dim:#8d97b5; --gold:#f0c35a; --gold2:#b8862b;
+  --good:#3fd28b; --bad:#ff6b6b; --mag:#9b8cff; --phy:#ffa25a;
+  --display:"Russo One","Onest",system-ui,sans-serif;
+  --body:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--body);font-size:14px;line-height:1.35;padding:0 16px 40px;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+img{display:block}
+
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);margin:0 -16px;padding:10px 16px 8px;border-bottom:1px solid var(--line)}
+.bar-in{max-width:1400px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.brand{font-family:var(--display);font-size:18px;letter-spacing:.02em;color:var(--gold);white-space:nowrap}
+.lab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+.lanes{display:flex;gap:6px}
+.lane{display:flex;flex-direction:column;align-items:center;gap:2px;width:58px;padding:5px 0 4px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font-size:11px;color:var(--dim)}
+.lane img{width:28px;height:28px}
+.lane[aria-pressed="true"]{background:linear-gradient(180deg,#3a2f12,#22200f);border-color:var(--gold);color:var(--gold)}
+.slots{display:flex;gap:6px;align-items:center}
+.slot{width:52px;height:52px;border-radius:50%;border:2px dashed var(--line);display:grid;place-items:center;color:var(--dim);font-size:18px;position:relative;overflow:hidden;background:var(--panel)}
+.slot.f{border:2px solid var(--bad)}
+.slot img{width:100%;height:100%;object-fit:cover}
+.slot.f::after{content:"×";position:absolute;right:0;top:0;width:16px;height:16px;border-radius:50%;background:var(--bad);color:#fff;font-size:12px;line-height:15px;text-align:center;opacity:0;transition:opacity .15s}
+.slot.f:hover::after{opacity:1}
+.clr{font-size:12px;color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel)}
+.mini{display:flex;gap:6px;align-items:center;margin-left:auto}
+.mini .m{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:30px;padding:3px 10px 3px 3px;font-size:12px}
+.mini .m:first-child{border-color:var(--gold)}
+.mini img{width:30px;height:30px;border-radius:50%}
+.tabs{display:none;width:100%;gap:6px}
+.tabs button{flex:1;padding:8px;border-radius:8px;background:var(--panel);border:1px solid var(--line);font-weight:600}
+.tabs button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+
+.wrap{max-width:1400px;margin:14px auto 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,460px);gap:18px;align-items:start}
+.pick{min-width:0}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+#q{flex:1 1 200px;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--fg);font:inherit;font-size:15px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:8px 12px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--dim)}
+.chip[aria-pressed="true"]{color:var(--fg);border-color:var(--fg)}
+.sec h3{font-family:var(--display);font-weight:400;font-size:14px;letter-spacing:.04em;color:var(--gold);margin:14px 0 8px;display:flex;align-items:center;gap:8px}
+.sec h3 img{width:20px;height:20px}
+.sec h3 span{color:var(--dim);font-family:var(--body);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}
+.h{display:flex;flex-direction:column;align-items:center;gap:4px;padding:5px 2px 4px;border-radius:10px;position:relative}
+.h:hover{background:var(--panel)}
+.h img{width:60px;height:60px;border-radius:12px;border:2px solid transparent}
+.h b{font-weight:500;font-size:11.5px;text-align:center;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h.sel img{border-color:var(--bad);filter:grayscale(.2) brightness(.65)}
+.h.sel::after{content:"✓";position:absolute;top:6px;right:8px;width:20px;height:20px;border-radius:50%;background:var(--bad);color:#fff;font-size:12px;display:grid;place-items:center}
+.h.full:not(.sel){opacity:.45}
+.empty{color:var(--dim);padding:16px 0}
+
+.adv{min-width:0;position:sticky;top:calc(env(safe-area-inset-top,0px) + 96px);max-height:calc(100vh - 110px);overflow:auto;padding-right:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h2{font-family:var(--display);font-weight:400;font-size:15px;letter-spacing:.03em;margin:0 0 10px;color:var(--gold)}
+.best{display:flex;gap:14px;align-items:center}
+.best>img{width:92px;height:92px;border-radius:16px;border:2px solid var(--gold)}
+.best .nm{font-family:var(--display);font-size:22px;line-height:1.1}
+.best .roles{color:var(--dim);font-size:12px;margin:2px 0 6px}
+.wr{font-size:13px;color:var(--dim)}
+.wr strong{font-size:22px;color:var(--good);font-weight:700;margin-right:4px}
+.wr strong.lo{color:var(--bad)}
+.vs{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.vs span{display:flex;align-items:center;gap:5px;background:var(--panel2);border-radius:20px;padding:2px 9px 2px 2px;font-size:12px;font-weight:600}
+.vs img{width:24px;height:24px;border-radius:50%}
+.pos{color:var(--good)}.neg{color:var(--bad)}.zero{color:var(--dim)}
+.note{font-size:12px;color:var(--dim);margin-top:8px}
+.alt{display:flex;flex-direction:column;gap:4px}
+.row{display:grid;grid-template-columns:22px 44px minmax(0,1fr) auto;gap:10px;align-items:center;padding:5px 6px;border-radius:10px;text-align:left;width:100%}
+.row:hover{background:var(--panel2)}
+.row[aria-pressed="true"]{background:var(--panel2);outline:1px solid var(--gold2)}
+.row .n{color:var(--dim);font-size:12px;text-align:right}
+.row img{width:44px;height:44px;border-radius:10px}
+.row .t{min-width:0}
+.row .t b{display:block;font-weight:600}
+.row .t i{font-style:normal;font-size:11.5px;color:var(--dim);display:flex;gap:6px;flex-wrap:wrap}
+.row .p{font-weight:700;font-size:15px}
+.ex .row{grid-template-columns:44px minmax(0,1fr) auto}
+.seq{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.it{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;min-width:0}
+.it .ic{position:relative}
+.it .ic img{width:52px;height:52px;border-radius:10px;border:1px solid var(--line)}
+.it .ic i{position:absolute;left:-5px;top:-5px;width:18px;height:18px;border-radius:50%;background:var(--gold);color:#1a1405;font-style:normal;font-weight:700;font-size:11px;display:grid;place-items:center}
+.it.sit .ic img{border-color:var(--mag)}
+.it.boot .ic img{border-color:var(--dim)}
+.it b{font-weight:500;font-size:10.5px;line-height:1.15;overflow-wrap:anywhere}
+.why{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.why div{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:center;font-size:12.5px}
+.why img{width:28px;height:28px;border-radius:6px}
+.why em{font-style:normal;color:var(--dim)}
+.kit{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.kit div{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.kit img{width:36px;height:36px;border-radius:50%;border:1px solid var(--line)}
+.kit small{display:block;color:var(--dim);font-size:11px}
+.dmg{height:10px;border-radius:6px;overflow:hidden;display:flex;background:var(--panel2);margin:6px 0 8px}
+.dmg .p{background:var(--phy)}.dmg .m{background:var(--mag)}
+.legend{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.tags span{font-size:12px;padding:3px 8px;border-radius:6px;background:var(--panel2)}
+.hint{font-size:13px;color:var(--dim);line-height:1.5}
+.alts-b{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.alts-b button{font-size:12px;padding:5px 9px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
+.alts-b button[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}
+.foot{max-width:1400px;margin:20px auto 0;font-size:11.5px;color:var(--dim)}
+
+@media (max-width:900px){
+  .wrap{grid-template-columns:minmax(0,1fr)}
+  .adv{position:static;max-height:none;overflow:visible}
+  .tabs{display:flex}
+  .mini{display:none}
+  .wrap[data-tab="pick"] .adv{display:none}
+  .wrap[data-tab="adv"] .pick{display:none}
+  .brand{display:none}
+  .bar-in{gap:8px 10px}
+  .lanes{width:100%;justify-content:space-between}
+  .lane{flex:1;width:auto}
+  .slots{width:100%;justify-content:space-between}
+  .slot{width:48px;height:48px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
+  .h img{width:56px;height:56px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="bar"><div class="bar-in">
+  <div class="brand">КОНТРПИК</div>
+  <div><div class="lab">Моя линия</div><div class="lanes" id="lanes"></div></div>
+  <div><div class="lab">Герои противника <span id="cnt">0/5</span></div>
+    <div class="slots" id="slots"></div></div>
+  <button class="clr" id="clr" type="button">Сбросить</button>
+  <div class="mini" id="mini"></div>
+  <div class="tabs" id="tabs">
+    <button type="button" data-t="pick" aria-pressed="true">Враги</button>
+    <button type="button" data-t="adv" aria-pressed="false" id="tabAdv">Совет</button>
+  </div>
+</div></div>
+
+<div class="wrap" id="wrap" data-tab="pick">
+  <section class="pick">
+    <div class="tools">
+      <input id="q" type="search" placeholder="Поиск героя (можно по-русски)" autocomplete="off">
+      <div class="chips" id="lf"></div>
+    </div>
+    <div id="pickList"></div>
+  </section>
+  <aside class="adv" id="adv"></aside>
+</div>
+<div class="foot">Данные: официальная статистика Moonton (ранги Все + Mythic) через Rone Arena API, обновлено 02.10.2026, 133 героя. Процент рядом с врагом — насколько меняется винрейт героя в матчах против него.</div>
+
+<script src="data.js"></script>
+<script>
+(()=>{
+const D=window.MLBB, H=D.heroes, M=D.M, IT=D.items;
+const IDX={}; H.forEach((h,i)=>IDX[h.id]=i);
+const LANES=[["exp","Опыт"],["mid","Мид"],["roam","Роум"],["jungle","Лес"],["gold","Золото"]];
+const LN=Object.fromEntries(LANES);
+const ROLE={fighter:"Боец",mage:"Маг",marksman:"Стрелок",assassin:"Убийца",tank:"Танк",support:"Поддержка"};
+const SPELL_RU={Flicker:"Вспышка",Retribution:"Возмездие",Execute:"Кара",Inspire:"Вдохновение",Sprint:"Спринт",Purify:"Очищение",Aegis:"Щит",Petrify:"Оцепенение",Flameshot:"Огненный выстрел",Vengeance:"Месть",Revitalize:"Исцеление",Arrival:"Прибытие"};
+const EMB_RU={Fighter:"Боец",Assassin:"Убийца",Mage:"Маг",Support:"Поддержка",All:"Общая",Marksman:"Стрелок",Tank:"Танк"};
+const laneImg={}; for(const k in D.laneSvg) laneImg[k]="data:image/svg+xml,"+encodeURIComponent(D.laneSvg[k]);
+H.forEach(h=>{h.r=h.r.map(r=>r.toLowerCase()); h.wb=(h.wr+h.wrm)/2;});
+const pct=(v,d=1)=>(v>0?"+":"")+(v*100).toFixed(d)+"%";
+const cls=v=>v>0.002?"pos":v<-0.002?"neg":"zero";
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- hero profiles from their real builds ---------- */
+const HEAL_NAMES=new Set(["Estes","Rafaela","Angela","Floryn","Kalea","Alucard","Ruby","Uranus","Esmeralda","Yu Zhong","Thamuz","Alice","Hylos","Aldous","Dyrroth","Lapu-Lapu","X.Borg","Fredrinn","Cici","Sora","Lukas","Aulus","Gloo","Mathilda","Diggie","Marcel"]);
+const CC_NAMES=new Set(["Atlas","Tigreal","Khufra","Franco","Chou","Kaja","Lolita","Minotaur","Gatotkaca","Akai","Barats","Edith","Aurora","Vale","Kadita","Saber","Paquito","Yve","Luo Yi","Carmilla","Grock","Jawhead","Johnson","Belerick","Baxia","Hylos","Selena","Eudora","Valentina","Novaria","Chip","Silvanna","Martis","Minsitthar","Badang","Phoveus","Arlott","Zhuxin","Kalea","Terizla","Guinevere","Cecilion","Lylia","Faramis","Hilda","Masha","Gloo","Ruby","Odette","Pharsa","Nana","Moskov","Brody"]);
+const LS=new Set([3002,3012,2013,3103,3106,3104,2208,2108,3004,2005,2011]), CRIT=new Set([3003,3002,3005,3014,2003]), AS=new Set([2006,2008,3013,3015,2009,3005,2003,3012,2108]);
+const isBoot=id=>(id>=2301&&id<=2308)||(id>=3400&&id<3600)||id===1301||(id>=1411&&id<=1514);
+function profile(h){
+  const bl=D.builds[h.id]||{}; let p=0,m=0,d=0,ls=0,cr=0,as=0,n=0;
+  for(const ln in bl) for(const b of bl[ln]) for(const id of b.items){ if(isBoot(id)) continue; n++;
+    const g=Math.floor(id/100)%10;
+    if(id===2107||id===2014||id===2208||id===3109){ if(h.r.includes("mage")) m++; else p++; }
+    else if(g===0) p++; else if(g===1) m++; else if(g===2) d++;
+    if(LS.has(id)) ls++; if(CRIT.has(id)) cr++; if(AS.has(id)) as++; }
+  n=n||1; const r=h.r;
+  const dmg = m>p ? "m" : (p>m ? "p" : (r.includes("mage")?"m":"p"));
+  const tank = r[0]==="tank" || d/n>=0.45;
+  return {dmg, tank, def:d/n,
+    heal: HEAL_NAMES.has(h.n)? 1 : (ls/n>=0.55?0.6:0),
+    crit: cr/n>=0.3, as: r.includes("marksman")&&as/n>=0.25 || as/n>=0.45,
+    burst: r.includes("assassin"), cc: CC_NAMES.has(h.n)||r[0]==="tank",
+    share: tank? 0.45 : (r[0]==="support"?0.6:1)};
+}
+H.forEach(h=>h.pf=profile(h));
+
+/* ---------- state ---------- */
+const st={lane:null, enemies:[], q:"", lf:"all", focus:null, tab:"pick"};
+try{ const l=localStorage.getItem("mlbb-lane"); if(LN[l]) st.lane=l; }catch(e){}
+try{ const e=JSON.parse(sessionStorage.getItem("mlbb-enemies")||"[]"); if(Array.isArray(e)) st.enemies=e.filter(id=>IDX[id]!==undefined).slice(0,5);}catch(e){}
+if(!st.lane && !st.enemies.length){ st.lane="exp"; }
+const save=()=>{ try{localStorage.setItem("mlbb-lane",st.lane||"")}catch(e){} try{sessionStorage.setItem("mlbb-enemies",JSON.stringify(st.enemies))}catch(e){} };
+
+/* ---------- scoring ---------- */
+const conf=h=>h.pr/(h.pr+0.002);
+const mu=(hi,ei)=>Math.max(-0.07,Math.min(0.07,M[ei][hi]/10000)); // how much hero hi's WR changes vs enemy ei
+function laneWeight(e){ if(!st.lane) return 1; if(e.l[0]===st.lane) return 1.7; if(e.l.includes(st.lane)) return 1.3; return 1; }
+function rankFor(lane){
+  const en=st.enemies.map(id=>H[IDX[id]]);
+  const out=[];
+  for(let i=0;i<H.length;i++){ const h=H[i];
+    if(!h.l.includes(lane) || st.enemies.includes(h.id)) continue;
+    const c=conf(h); let s=0, sum=0, worst=1, vs=[];
+    for(const e of en){ const v=mu(i,IDX[e.id]); vs.push([e,v]); sum+=v; s+=v*laneWeight(e); if(v<worst) worst=v; }
+    const meta=(h.wb-0.5)*(en.length?0.35:1) + (en.length?0:Math.min(h.pr,0.02)*0.4);
+    const pen=en.length && worst<-0.02 ? (worst+0.02)*0.9 : 0;
+    const prim=h.l[0]===lane?0.003:0;
+    const score=s*c+meta+pen+prim;
+    out.push({h,score,exp:Math.max(0.3,Math.min(0.75,h.wb+sum*c)),vs,sum});
+  }
+  return out.sort((a,b)=>b.score-a.score);
+}
+
+/* ---------- items ---------- */
+function enemyComp(){
+  const en=st.enemies.map(id=>H[IDX[id]]);
+  const c={p:0,m:0,heal:0,tank:0,crit:0,as:0,burst:0,cc:0,who:{heal:[],tank:[],crit:[],as:[],burst:[],cc:[],p:[],m:[]}};
+  for(const e of en){ const f=e.pf;
+    c[f.dmg]+=f.share; c.who[f.dmg].push(e.n);
+    if(f.heal){c.heal+=f.heal;c.who.heal.push(e.n);}
+    if(f.tank){c.tank++;c.who.tank.push(e.n);}
+    if(f.crit){c.crit++;c.who.crit.push(e.n);}
+    if(f.as){c.as++;c.who.as.push(e.n);}
+    if(f.burst){c.burst++;c.who.burst.push(e.n);}
+    if(f.cc){c.cc++;c.who.cc.push(e.n);} }
+  c.n=en.length; return c;
+}
+const list=a=>a.slice(0,3).join(", ");
+function pickBuild(h,lane){
+  const bl=D.builds[h.id]||{}; const arr=bl[lane]||bl[h.l[0]]||Object.values(bl)[0]||[];
+  if(!arr.length) return null;
+  const mx=Math.max(...arr.map(b=>b.pr));
+  return arr.filter(b=>b.pr>=mx*0.6).sort((a,b)=>b.wr-a.wr)[0];
+}
+function situational(h,c,core){
+  const f=h.pf, r=h.r[0], defensive=r==="tank"||r==="support"||f.tank;
+  const C=[]; const add=(id,score,why,grp)=>{ if(score>0&&IT[id]&&!core.includes(id)) C.push({id,score,why,grp}); };
+  if(defensive){
+    add(3206,c.heal?1.4+c.heal*0.8+c.as*0.3:(c.as>=2?0.9:0),c.heal?"режет лечение и щиты: "+list(c.who.heal):"защита от стрелков рядом","heal");
+    add(3203,c.p*0.7,"физический урон по скиллам: "+list(c.who.p),"pd");
+    add(2207,c.crit?1+c.crit*0.8:0,"против крита: "+list(c.who.crit),"pd");
+    add(3212,c.as?0.8+c.as*0.7:0,"режет скорость атаки: "+list(c.who.as),"pd");
+    add(3205,c.m*0.8,"магический урон: "+list(c.who.m),"md");
+    add(3210,c.m*0.6,"затяжной маг. урон: "+list(c.who.m),"md");
+    add(3208,c.cc>=3?1.1:0,"много контроля: "+list(c.who.cc),"x");
+    add(3207,0.95,"второй шанс в тимфайте","x");
+    add(2212,r==="tank"?0.85:0.4,"урон и замедление для танка","x");
+  }else if(f.dmg==="p"){
+    add(3013,c.heal?2+c.heal:0,"антилечение: "+list(c.who.heal),"heal");
+    add(3001,c.tank?1.4+c.tank*0.5:0.4,c.tank?"пробивание брони против: "+list(c.who.tank):"пробивание брони","pen");
+    if(f.as) add(2006,c.tank>=2?1.3+c.tank*0.3:0,"% от здоровья против толстых: "+list(c.who.tank),"pen");
+    add(3207,1+c.burst*0.6,c.burst?"переживёт прыжок: "+list(c.who.burst):"второй шанс в тимфайте","sv");
+    if(h.r.includes("marksman")) add(2011,(c.p>=2&&c.burst+c.as>=2)?1.2+c.p*0.2:0,"иммун к физ. урону: "+list(c.who.p),"sv");
+    if(!h.r.includes("marksman")){
+      add(3203,c.p>=2.2?c.p-1.4:0,"физический урон: "+list(c.who.p),"pd");
+      add(3205,c.m>=2?c.m-1.1:0,"магический урон: "+list(c.who.m),"md");
+      add(2207,c.crit&&h.r[0]==="fighter"?0.8+c.crit*0.5:0,"против крита: "+list(c.who.crit),"pd");
+    } else add(3205,c.m>=2.6?c.m-1.6:0,"магический бёрст: "+list(c.who.m),"md");
+  }else{
+    add(3105,c.heal?2+c.heal:(c.tank?0.8+c.tank*0.4:0),c.heal?"антилечение: "+list(c.who.heal):"жжёт % здоровья толстых: "+list(c.who.tank),"heal");
+    add(3101,1+c.tank*0.45,c.tank?"маг. пробивание против: "+list(c.who.tank):"маг. пробивание","pen");
+    add(2107,c.burst?1.3+c.burst*0.5:0.6,c.burst?"заморозка от прыжка: "+list(c.who.burst):"заморозка-спасение","sv");
+    add(3108,0.85+c.burst*0.3,"щит против бёрста","sv2");
+    add(3207,0.75+c.burst*0.2,"второй шанс в тимфайте","sv3");
+    add(3205,c.m>=2.4?c.m-1.4:0,"магический урон: "+list(c.who.m),"md");
+  }
+  C.sort((a,b)=>b.score-a.score);
+  const out=[], g=new Set();
+  for(const x of C){ if(g.has(x.grp)) continue; g.add(x.grp); out.push(x); if(out.length===2) break; }
+  return out;
+}
+function bootsFor(h,lane,c){
+  const f=h.pf, r=h.r[0]; let t, why;
+  if(r==="marksman"||(h.r.includes("marksman")&&f.dmg==="p")){t=5;why="скорость атаки";}
+  else if(r==="support"){t=3;why="перезарядка навыков";}
+  else if(f.dmg==="m"&&!f.tank){t=4;why="маг. пробивание";}
+  else {t=c.p>c.m?1:2; why=t===1?"физ. защита":"меньше контроля, маг. защита";}
+  if(c.n){
+    if((r==="marksman"||f.dmg==="m")&&!f.tank){ if(c.cc>=4){t=2;why="много контроля: "+list(c.who.cc);} }
+    else if(c.cc>=3||c.m>=2.4){t=2;why=c.cc>=3?"много контроля: "+list(c.who.cc):"маг. урон: "+list(c.who.m);}
+    else if(c.p>=2.4){t=1;why="физ. урон: "+list(c.who.p);}
+  }
+  let id=t===7?2308:2300+t;
+  if(lane==="jungle"){ const v=r==="tank"?3:(r==="mage"||r==="assassin")?2:1; id=3400+t*10+v; why+=" · Retribution"; }
+  if(lane==="roam"){ const v=r==="tank"?2:(r==="support"&&HEAL_NAMES.has(h.n))?3:(r==="support"?2:4); id=3500+t*10+v; why+=" · роум-бонус"; }
+  if(!IT[id]) id=2300+(t===7?8:t);
+  return {id,why};
+}
+
+/* ---------- render: static parts ---------- */
+const $=s=>document.querySelector(s);
+$("#lanes").innerHTML=LANES.map(([k,n])=>`<button class="lane" type="button" data-l="${k}" aria-pressed="false"><img src="${laneImg[k]}" alt="">${n}</button>`).join("");
+$("#lf").innerHTML=[["all","Все"],...LANES].map(([k,n])=>`<button class="chip" type="button" data-f="${k}" aria-pressed="${k==="all"}">${n}</button>`).join("");
+
+const TR={"а":"a","б":"b","в":"v","г":"g","д":"d","е":"e","ё":"e","ж":"zh","з":"z","и":"i","й":"y","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f","х":"h","ц":"c","ч":"ch","ш":"sh","щ":"sh","ъ":"","ы":"y","ь":"","э":"e","ю":"yu","я":"ya"};
+const norm=s=>s.toLowerCase().replace(/[а-яё]/g,c=>TR[c]).replace(/[^a-z0-9]/g,"");
+const skel=s=>s.replace(/[aeiouy]/g,"").replace(/(.)\1+/g,"$1");
+H.forEach(h=>{h.k=norm(h.n); h.sk=skel(h.k);});
+function match(h,q){ if(!q) return true; if(h.k.includes(q)) return true; const s=skel(q); return s.length>=2 && h.sk.startsWith(s); }
+
+function tile(h){ return `<button class="h" type="button" data-id="${h.id}" title="${esc(h.n)}"><img src="${h.img}" alt="" loading="lazy" width="60" height="60"><b>${esc(h.n)}</b></button>`; }
+function renderPicker(){
+  const q=norm(st.q); let html="";
+  const lanes=st.lf==="all"?LANES:LANES.filter(l=>l[0]===st.lf);
+  if(q){
+    const hs=H.filter(h=>match(h,q)).sort((a,b)=>a.n.localeCompare(b.n));
+    html=hs.length?`<div class="sec"><h3>Найдено <span>${hs.length}</span></h3><div class="grid">${hs.map(tile).join("")}</div></div>`:`<div class="empty">Нет героя «${esc(st.q)}». Попробуй английское имя.</div>`;
+  } else for(const [k,n] of lanes){
+    const hs=H.filter(h=>h.l.includes(k)).sort((a,b)=>(b.l[0]===k)-(a.l[0]===k)||a.n.localeCompare(b.n));
+    html+=`<div class="sec"><h3><img src="${laneImg[k]}" alt="">${n.toUpperCase()} <span>${hs.length}</span></h3><div class="grid">${hs.map(tile).join("")}</div></div>`;
+  }
+  $("#pickList").innerHTML=html; markPicker();
+}
+function markPicker(){
+  const full=st.enemies.length>=5;
+  document.querySelectorAll(".h").forEach(b=>{ const id=+b.dataset.id; b.classList.toggle("sel",st.enemies.includes(id)); b.classList.toggle("full",full); });
+}
+
+/* ---------- render: dynamic ---------- */
+function renderBar(){
+  document.querySelectorAll(".lane").forEach(b=>b.setAttribute("aria-pressed",b.dataset.l===st.lane));
+  let s=""; for(let i=0;i<5;i++){ const id=st.enemies[i];
+    s+= id!==undefined ? `<button class="slot f" type="button" data-rm="${id}" title="Убрать ${esc(H[IDX[id]].n)}"><img src="${H[IDX[id]].img}" alt="${esc(H[IDX[id]].n)}"></button>` : `<div class="slot">${i+1}</div>`; }
+  $("#slots").innerHTML=s; $("#cnt").textContent=st.enemies.length+"/5";
+}
+function vsChips(vs){ return vs.map(([e,v])=>`<span><img src="${e.img}" alt="">${esc(e.n)} <em class="${cls(v)}" style="font-style:normal">${pct(v)}</em></span>`).join(""); }
+function renderAdv(){
+  const adv=$("#adv");
+  if(!st.lane){ adv.innerHTML=`<div class="card"><h2>Выбери свою линию</h2><div class="hint">Нажми на линию вверху. Потом отмечай героев противника — совет пересчитывается после каждого.</div></div>`; $("#mini").innerHTML=""; return; }
+  const R=rankFor(st.lane); const n=st.enemies.length;
+  if(!R.length){ adv.innerHTML=""; return; }
+  if(!st.focus || !R.find(x=>x.h.id===st.focus)) st.focus=R[0].h.id;
+  const best=R[0];
+  const roles=h=>h.r.map(r=>ROLE[r]||r).join(" · ");
+  let html=`<div class="card"><h2>${n?"Лучший контрпик на "+LN[st.lane].toLowerCase():"Сильнейшие на "+LN[st.lane].toLowerCase()+" сейчас"}</h2>
+   <button type="button" class="best" data-f="${best.h.id}" style="text-align:left;width:100%"><img src="${best.h.img}" alt=""><div>
+    <div class="nm">${esc(best.h.n)}</div><div class="roles">${roles(best.h)}</div>
+    <div class="wr"><strong class="${best.exp<0.5?"lo":""}">${(best.exp*100).toFixed(1)}%</strong> ${n?"прогноз винрейта против этих врагов":"винрейт героя (Все + Mythic)"}</div></div></button>
+   ${n?`<div class="vs">${vsChips(best.vs)}</div>`:`<div class="note">Пока врагов нет — показана сила героев на линии. Отметь первого врага, и список станет контрпиком.</div>`}
+  </div>`;
+  html+=`<div class="card"><h2>Другие варианты</h2>${n?`<div class="note" style="margin:-4px 0 8px">Порядок — по силе против именно этих врагов (враг с твоей линии важнее), а не по общему винрейту.</div>`:""}<div class="alt">${R.slice(1,9).map((x,i)=>`
+    <button class="row" type="button" data-f="${x.h.id}" aria-pressed="${x.h.id===st.focus}"><span class="n">${i+2}</span><img src="${x.h.img}" alt="">
+     <span class="t"><b>${esc(x.h.n)}</b><i>${n?x.vs.map(([e,v])=>`<span class="${cls(v)}">${esc(e.n.split(" ")[0])} ${pct(v)}</span>`).join(""):roles(x.h)}</i></span>
+     <span class="p ${x.exp>=0.5?"pos":"neg"}">${(x.exp*100).toFixed(1)}%</span></button>`).join("")}</div></div>`;
+  html+=buildCard(H[IDX[st.focus]], R.find(x=>x.h.id===st.focus));
+  if(n){
+    const worst=R.slice().sort((a,b)=>a.sum-b.sum).filter(x=>x.sum<0).slice(0,4);
+    if(worst.length) html+=`<div class="card ex"><h2>Не бери на эту линию</h2><div class="alt">${worst.map(x=>`
+      <button class="row" type="button" data-f="${x.h.id}" aria-pressed="${x.h.id===st.focus}"><img src="${x.h.img}" alt=""><span class="t"><b>${esc(x.h.n)}</b><i>${x.vs.filter(v=>v[1]<-0.005).map(([e,v])=>`<span class="neg">${esc(e.n.split(" ")[0])} ${pct(v)}</span>`).join("")}</i></span><span class="p neg">${pct(x.sum)}</span></button>`).join("")}</div></div>`;
+    html+=compCard();
+  }
+  adv.innerHTML=html;
+  $("#mini").innerHTML=R.slice(0,3).map(x=>`<button class="m" type="button" data-f="${x.h.id}"><img src="${x.h.img}" alt="">${esc(x.h.n)} <b class="${x.exp>=0.5?"pos":"neg"}">${(x.exp*100).toFixed(0)}%</b></button>`).join("");
+  $("#tabAdv").textContent=n?`Совет: ${best.h.n}`:"Совет";
+}
+function buildCard(h,x){
+  const c=enemyComp(); const b=pickBuild(h,st.lane);
+  if(!b) return `<div class="card"><h2>Сборка ${esc(h.n)}</h2><div class="hint">Нет данных о сборке.</div></div>`;
+  const core=b.items.filter(id=>!isBoot(id)&&IT[id]).slice(0,3);
+  const boots=bootsFor(h,st.lane,c);
+  const sit=situational(h,c,core);
+  let seq;
+  const B={id:boots.id,k:"boot"}, Cs=core.map(id=>({id,k:"core"})), S=sit.map(s=>({id:s.id,k:"sit",why:s.why}));
+  if(st.lane==="jungle"||st.lane==="roam") seq=[B,...Cs,...S]; else seq=[Cs[0],B,...Cs.slice(1),...S].filter(Boolean);
+  const anti=S.find(s=>s.id===3013||s.id===3105||s.id===3206);
+  let early=false;
+  if(anti && c.heal>=1.7 && seq.indexOf(anti)>3){ seq.splice(seq.indexOf(anti),1); seq.splice(3,0,anti); early=true; }
+  const sp=D.spells[b.spell], em=D.emblems[b.emblem];
+  const item=(s,i)=>`<div class="it ${s.k}"><div class="ic"><img src="${IT[s.id].img}" alt=""><i>${i+1}</i></div><b>${esc(IT[s.id].n)}</b></div>`;
+  return `<div class="card"><h2>Сборка: ${esc(h.n)} · ${LN[st.lane]}</h2>
+   <div class="kit">
+    ${sp?`<div><img src="${sp.img}" alt=""><span>${esc(SPELL_RU[sp.n]||sp.n)}<small>заклинание · ${esc(sp.n)}</small></span></div>`:""}
+    ${em?`<div><img src="${em.img}" alt=""><span>${esc(EMB_RU[em.n]||em.n)}<small>эмблема</small></span></div>`:""}
+    ${x&&st.enemies.length?`<div><span><b class="${x.exp>=0.5?"pos":"neg"}" style="font-size:18px">${(x.exp*100).toFixed(1)}%</b><small>прогноз против врагов</small></span></div>`:""}
+   </div>
+   <div class="seq">${seq.map(item).join("")}</div>
+   <div class="why">
+    <div><img src="${IT[core[0]].img}" alt=""><span><b>Основа</b> — самая успешная сборка Mythic на этой линии <em>(винрейт ${(b.wr*100).toFixed(1)}%)</em></span></div>
+    <div><img src="${IT[boots.id].img}" alt=""><span><b>${esc(IT[boots.id].n)}</b> <em>— ${esc(boots.why)}</em></span></div>
+    ${S.map(s=>`<div><img src="${IT[s.id].img}" alt=""><span><b>${esc(IT[s.id].n)}</b> <em>— ${esc(s.why)}${early&&s===anti?" · брать рано":""}</em></span></div>`).join("")}
+    ${!st.enemies.length?`<div><span></span><em>Последние 2 предмета подстроятся под врагов, когда ты их отметишь.</em></div>`:""}
+   </div>
+   ${st.enemies.length&&x?`<div class="vs">${vsChips(x.vs)}</div>`:""}
+  </div>`;
+}
+function compCard(){
+  const c=enemyComp(); const tot=c.p+c.m||1;
+  const tags=[];
+  if(c.heal) tags.push(`Лечение: ${list(c.who.heal)}`);
+  if(c.tank) tags.push(`Толстые: ${list(c.who.tank)}`);
+  if(c.burst) tags.push(`Убийцы: ${list(c.who.burst)}`);
+  if(c.cc>=2) tags.push(`Контроль: ${c.cc}`);
+  if(c.crit) tags.push(`Крит: ${list(c.who.crit)}`);
+  return `<div class="card"><h2>Состав противника</h2>
+   <div class="legend"><span style="color:var(--phy)">Физ. урон ${Math.round(c.p/tot*100)}%</span><span style="color:var(--mag)">Маг. урон ${Math.round(c.m/tot*100)}%</span></div>
+   <div class="dmg"><div class="p" style="width:${c.p/tot*100}%"></div><div class="m" style="width:${c.m/tot*100}%"></div></div>
+   <div class="tags">${tags.map(t=>`<span>${esc(t)}</span>`).join("")}</div></div>`;
+}
+function renderAll(){ renderBar(); markPicker(); renderAdv(); save(); }
+
+/* ---------- events ---------- */
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button"); if(!t) return;
+  if(t.dataset.l){ st.lane=t.dataset.l; st.focus=null; renderAll(); return; }
+  if(t.dataset.rm){ st.enemies=st.enemies.filter(i=>i!==+t.dataset.rm); st.focus=null; renderAll(); return; }
+  if(t.classList.contains("h")){ const id=+t.dataset.id; const i=st.enemies.indexOf(id);
+    if(i>=0) st.enemies.splice(i,1); else if(st.enemies.length<5) st.enemies.push(id); else return;
+    st.focus=null; if(st.q){ st.q=""; $("#q").value=""; renderPicker(); } renderAll(); return; }
+  if(t.dataset.f && t.closest("#lf")){ st.lf=t.dataset.f; document.querySelectorAll("#lf .chip").forEach(c=>c.setAttribute("aria-pressed",c===t)); renderPicker(); return; }
+  if(t.dataset.f){ st.focus=+t.dataset.f; renderAdv(); if(t.closest("#mini")) setTab("adv"); return; }
+  if(t.dataset.t){ setTab(t.dataset.t); return; }
+  if(t.id==="clr"){ st.enemies=[]; st.focus=null; renderAll(); }
+});
+function setTab(x){ st.tab=x; $("#wrap").dataset.tab=x; document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.t===x)); if(x==="adv") window.scrollTo(0,0); }
+$("#q").addEventListener("input",e=>{ st.q=e.target.value; renderPicker(); });
+$("#q").addEventListener("keydown",e=>{ if(e.key==="Enter"){ const b=document.querySelector("#pickList .h"); if(b) b.click(); }});
+
+renderPicker(); renderAll();
+})();
+</script>
